@@ -7,7 +7,6 @@ scikit-learn
 joblib
 numpy
 sqlalchemy
-os
 asyncio
 re
 hashlib
