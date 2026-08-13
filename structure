@@ -1,0 +1,12 @@
+football_ai/
+│
+├── config.py                 # DB & API Keys Configs
+├── database.py               # SQLite/PostgreSQL Models & History Tracker
+├── services/
+│   ├── espn_service.py       # Live Match Fetcher
+│   ├── odds_service.py       # Asian Handicap & Sharp Odds Engine
+│   └── stats_service.py      # Player xG & Contextual Data (Referee/Weather)
+├── ml/
+│   ├── model.py              # LSTM & Hybrid Predictive Engine
+│   └── scheduler.py          # Auto-Retraining Pipeline
+└── main.py                   # Complete Integrated FastAPI Server

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoalPulse AI - Dynamic Score Engine</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { 
+            background-color: #0f172a; 
+            color: #f8fafc; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        }
+        .navbar { 
+            background-color: #1e293b; 
+            border-bottom: 1px solid #334155; 
+        }
+        .card { 
+            background-color: #1e293b; 
+            border: 1px solid #334155; 
+            color: #f8fafc; 
+        }
+        .match-card { 
+            transition: transform 0.2s, border-color 0.2s; 
+            cursor: pointer; 
+        }
+        .match-card:hover { 
+            transform: translateY(-3px); 
+            border-color: #38bdf8; 
+        }
+        .badge-live { 
+            background-color: #ef4444; 
+            animation: pulse 1.5s infinite; 
+        }
+        @keyframes pulse { 
+            0% { opacity: 1; } 
+            50% { opacity: 0.5; } 
+            100% { opacity: 1; } 
+        }
+        .date-btn.active { 
+            background-color: #0284c7 !important; 
+            border-color: #0284c7 !important; 
+            color: white !important; 
+        }
+        .form-control { 
+            background-color: #334155; 
+            border: 1px solid #475569; 
+            color: #fff; 
+        }
+        .form-control:focus { 
+            background-color: #334155; 
+            color: #fff; 
+            border-color: #38bdf8; 
+            box-shadow: none; 
+        }
+        .form-badge {
+            font-size: 0.65rem;
+            padding: 2px 5px;
+            font-weight: bold;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navbar -->
+    <nav class="navbar navbar-dark py-3">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                <i class="fas fa-futbol text-info fa-lg"></i>
+                <span class="fw-bold fs-4">GoalPulse AI</span>
+            </a>
+        </div>
+    </nav>
+
+    <div class="container my-4">
+        
+        <!-- Date Filter Bar -->
+        <div class="card p-3 mb-4">
+            <div class="d-flex justify-content-center align-items-center gap-2 flex-wrap">
+                <button class="btn btn-outline-info date-btn" data-date="yesterday" onclick="filterByDate('yesterday')">
+                    <i class="fas fa-chevron-left me-1"></i> မနေ့က
+                </button>
+                <button class="btn btn-outline-info date-btn active" data-date="today" onclick="filterByDate('today')">
+                    ဒီနေ့
+                </button>
+                <button class="btn btn-outline-info date-btn" data-date="tomorrow" onclick="filterByDate('tomorrow')">
+                    မနက်ဖြန် <i class="fas fa-chevron-right ms-1"></i>
+                </button>
+                <div class="ms-2">
+                    <input type="date" id="matchDatePicker" class="form-control" onchange="filterByCustomDate(this.value)">
+                </div>
+            </div>
+        </div>
+
+        <!-- Fixtures Container -->
+        <h5 class="mb-3 text-info"><i class="fas fa-calendar-alt me-2"></i>ပွဲစဉ်များ (Matches)</h5>
+        <div id="matchesContainer" class="row g-3">
+            <div class="text-center py-5">
+                <div class="spinner-border text-info" role="status"></div>
+                <p class="mt-2 text-muted">ပွဲစဉ်များ ဒေတာ ရယူနေပါသည်...</p>
+            </div>
+        </div>
+
+        <!-- Detailed Prediction Result Modal -->
+        <div class="modal fade" id="predictionModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content card">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title text-info" id="modalTitle">AI Prediction</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="modalBody">
+                        <!-- Content via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Bootstrap 5 JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = "http://127.0.0.1:8000";
+
+        function getDateString(offset = 0) {
+            const d = new Date();
+            d.setDate(d.getDate() + offset);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const todayStr = getDateString(0);
+            document.getElementById("matchDatePicker").value = todayStr;
+            loadFixtures(todayStr);
+        });
+
+        function filterByDate(type) {
+            let selectedDate = "";
+            document.querySelectorAll(".date-btn").forEach(btn => btn.classList.remove("active"));
+
+            if (type === 'yesterday') {
+                selectedDate = getDateString(-1);
+            } else if (type === 'today') {
+                selectedDate = getDateString(0);
+            } else if (type === 'tomorrow') {
+                selectedDate = getDateString(1);
+            }
+
+            const activeBtn = document.querySelector(`[data-date="${type}"]`);
+            if (activeBtn) activeBtn.classList.add("active");
+
+            document.getElementById("matchDatePicker").value = selectedDate;
+            loadFixtures(selectedDate);
+        }
+
+        function filterByCustomDate(selectedDate) {
+            if (!selectedDate) return;
+            document.querySelectorAll(".date-btn").forEach(btn => btn.classList.remove("active"));
+            loadFixtures(selectedDate);
+        }
+
+        async function loadFixtures(dateStr) {
+            const container = document.getElementById("matchesContainer");
+            container.innerHTML = `
+                <div class="text-center py-5">
+                    <div class="spinner-border text-info" role="status"></div>
+                    <p class="mt-2 text-muted">ESPN Real-time API မှ ပွဲစဉ်များ ရယူနေပါသည် (${dateStr})...</p>
+                </div>`;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/live-matches?date=${dateStr}`);
+                const data = await res.json();
+                renderMatches(data.matches || []);
+            } catch (err) {
+                console.error(err);
+                container.innerHTML = `<div class="alert alert-danger">Backend Server သို့ ချိတ်ဆက်၍ မရပါ (${err.message})</div>`;
+            }
+        }
+
+        function renderMatches(matches) {
+            const container = document.getElementById("matchesContainer");
+            if (matches.length === 0) {
+                container.innerHTML = `<div class="col-12 text-center py-5 text-warning"><i class="fas fa-exclamation-circle me-2"></i>ရွေးချယ်ထားသော ရက်စွဲတွင် တိုက်ရိုက်ပွဲစဉ်များ မရှိပါ။ အခြားရက်စွဲတစ်ခု ရွေးချယ်ကြည့်ပါ။</div>`;
+                return;
+            }
+
+            container.innerHTML = matches.map(m => `
+                <div class="col-md-6 col-lg-4">
+                    <div class="card match-card p-3" onclick="getPrediction('${m.homeTeam}', '${m.awayTeam}')">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-secondary">${m.leagueName}</span>
+                            <span class="badge ${m.status === 'LIVE' ? 'badge-live' : 'bg-dark'}">${m.status}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center my-2 text-center">
+                            <div class="fw-bold w-40">${m.homeTeam}</div>
+                            <div class="badge bg-info text-dark fs-6">${m.homeScore} - ${m.awayScore}</div>
+                            <div class="fw-bold w-40">${m.awayTeam}</div>
+                        </div>
+                        <div class="text-center text-muted small mt-2">
+                            <i class="far fa-clock me-1"></i> ${m.matchDate} | ${m.kickoffTime}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Helper to Render Form Badges (W, D, L)
+        function renderFormBadges(formStr) {
+            if (!formStr) return '';
+            return formStr.split('').map(char => {
+                let bgClass = 'bg-secondary';
+                if (char === 'W') bgClass = 'bg-success';
+                else if (char === 'D') bgClass = 'bg-warning text-dark';
+                else if (char === 'L') bgClass = 'bg-danger';
+                return `<span class="badge ${bgClass} form-badge me-1">${char}</span>`;
+            }).join('');
+        }
+
+        async function getPrediction(home, away) {
+            const modal = new bootstrap.Modal(document.getElementById('predictionModal'));
+            const modalBody = document.getElementById('modalBody');
+            
+            document.getElementById('modalTitle').innerText = `${home} vs ${away}`;
+            modalBody.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border text-info"></div>
+                    <p class="mt-2">Enhanced Dixon-Coles AI Engine ဖြင့် ခန့်မှန်းတွက်ချက်နေပါသည်...</p>
+                </div>`;
+            modal.show();
+
+            try {
+                const res = await fetch(`${API_BASE}/predict/custom`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ home_team: home, away_team: away })
+                });
+                const data = await res.json();
+
+                const homeStatus = (data.official_lineup_status?.home || []).map(s => `<li class="text-light py-1">${s}</li>`).join('');
+                const awayStatus = (data.official_lineup_status?.away || []).map(s => `<li class="text-light py-1">${s}</li>`).join('');
+
+                const homeFormBadges = renderFormBadges(data.form_and_h2h?.home_form_5);
+                const awayFormBadges = renderFormBadges(data.form_and_h2h?.away_form_5);
+                const h2hStatus = data.form_and_h2h?.h2h_status || 'Balanced H2H';
+
+                modalBody.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-3 text-muted small border-bottom border-secondary pb-2">
+                        <span><i class="fas fa-trophy text-warning me-1"></i> ${data.match_info.league}</span>
+                        <span><i class="far fa-clock me-1"></i> ${data.match_info.match_date} | ${data.match_info.kickoff_time}</span>
+                    </div>
+
+                    <div class="row text-center mb-3">
+                        <div class="col-6">
+                            <small class="text-muted">AI Primary Pick</small>
+                            <h4 class="text-success fw-bold m-0">${data.recommended_pick}</h4>
+                            <span class="badge bg-primary mt-1">Confidence: ${data.confidence_score}%</span>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Predicted Score</small>
+                            <h4 class="text-warning fw-bold m-0">${data.dixon_coles.predicted_score}</h4>
+                            <small class="text-muted">Dixon-Coles Scoreline</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 text-center mb-3">
+                        <div class="col-4">
+                            <div class="bg-dark p-2 rounded border border-secondary">
+                                <small class="text-muted">Home Win</small>
+                                <div class="fw-bold text-info">${data.probabilities.home_win}</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="bg-dark p-2 rounded border border-secondary">
+                                <small class="text-muted">Draw</small>
+                                <div class="fw-bold text-warning">${data.probabilities.draw}</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="bg-dark p-2 rounded border border-secondary">
+                                <small class="text-muted">Away Win</small>
+                                <div class="fw-bold text-danger">${data.probabilities.away_win}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-dark p-3 rounded mb-3 border border-secondary">
+                        <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-2">
+                            <span><i class="fas fa-futbol me-2 text-info"></i> Goal Line:</span>
+                            <strong class="text-warning">${data.over_under.pick}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-2">
+                            <span><i class="fas fa-balance-scale me-2 text-info"></i> Asian Handicap:</span>
+                            <strong class="text-info">${data.asian_handicap.asian_handicap_line}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-2">
+                            <span><i class="fas fa-history me-2 text-info"></i> H2H Factor:</span>
+                            <strong class="text-light">${h2hStatus}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-chart-line me-2 text-info"></i> Expected Goals (xG):</span>
+                            <strong>${home} (${data.expected_goals.home_xg}) - ${away} (${data.expected_goals.away_xg})</strong>
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="bg-dark p-2 rounded border border-secondary">
+                                <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-1 mb-2">
+                                    <h6 class="text-info small mb-0">${home} Status</h6>
+                                    <div>${homeFormBadges}</div>
+                                </div>
+                                <ul class="list-unstyled mb-0 small">${homeStatus}</ul>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="bg-dark p-2 rounded border border-secondary">
+                                <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-1 mb-2">
+                                    <h6 class="text-info small mb-0">${away} Status</h6>
+                                    <div>${awayFormBadges}</div>
+                                </div>
+                                <ul class="list-unstyled mb-0 small">${awayStatus}</ul>
+                            </div>
+                        </div>
+                    </div>`;
+            } catch (err) {
+                console.error(err);
+                modalBody.innerHTML = `<div class="alert alert-danger">ခန့်မှန်းချက် ဒေတာ ရယူ၍ မရပါ (${err.message})</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
