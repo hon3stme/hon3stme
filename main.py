@@ -11,6 +11,7 @@ from difflib import SequenceMatcher
 import tempfile
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -47,6 +48,14 @@ class PredictionHistory(Base):
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="GoalPulse AI - Ultimate Robust Engine")
+
+@app.get("/", response_class=HTMLResponse)
+def read_index():
+    # index.html ဖိုင်ကို ရှာပြီး ဘရောက်ဇာမှာ ပြသရန်
+    if os.path.exists("index.html"):
+        with open("index.html", "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>index.html not found in project folder!</h1>"
 
 app.add_middleware(
     CORSMiddleware,
