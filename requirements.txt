@@ -6,3 +6,13 @@ pandas
 scikit-learn
 joblib
 numpy
+sqlalchemy
+os
+asyncio
+re
+hashlib
+datetime
+typing
+difflib
+tempfile
+pydantic
